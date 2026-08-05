@@ -1,8 +1,10 @@
 # Same topics, explained with basic ML words (simple version)
 
 Uses real ML terms (model, prediction, feature) but explains each one
-simply the first time it shows up. Pairs with `MENTAL_MODEL.md`, which has
-the full technical/code version of these same topics.
+simply the first time it shows up. Section 3 (the math) is a short recap
+only — for the full step-by-step build-up with a worked example, see
+`MENTAL_MODEL_BEGINNER.md`. For the full technical/code version of all
+these topics, see `MENTAL_MODEL.md`.
 
 ---
 
@@ -300,98 +302,39 @@ mix the two up.
 
 ---
 
-## 3. The math ideas — same three topics, simple version
+## 3. The math ideas — same three topics, quick recap
 
-### Idea 1: The fair credit-sharing rule (Shapley values)
+Full step-by-step version (with the worked lemonade-stand example) lives in
+`MENTAL_MODEL_BEGINNER.md` — read that for the complete build-up. Here's
+just the one-paragraph summary of each, for quick reference:
 
-Three friends work together on something and it turns out great. How do you
-fairly decide who gets how much credit?
+- **Shapley values (fair credit-sharing)** — the fair way to split credit
+  for a joint result among several contributors: imagine every possible
+  order they could have joined in, work out how much each one added right
+  when they joined, and average that across all the orders. SHAP applies
+  this exact rule to model features instead of people — a feature's
+  Shapley value is its fair share of credit for one prediction, averaged
+  over every possible order the features could've been revealed to the
+  model.
 
-Here's the fair way: imagine every possible order the three friends could
-have joined in. For each order, ask "how much extra value did this friend
-add, right when they joined, given who was already there?" Do this for
-every possible order, then average it. That average is each friend's fair
-share of the credit.
+- **TreeSHAP (the fast shortcut for tree-based models)** — checking every
+  possible order directly is too slow once you have more than ~20
+  features. But for a decision tree, each yes/no fork already remembers,
+  from training, what fraction of examples went left vs. right — so you
+  can correctly work out every feature's fair share while walking the tree
+  just **once**, instead of separately checking every order. Same exact
+  Shapley answer, much faster to compute.
 
-This exact rule is called a **Shapley value**, from game theory (a branch
-of math about how people/things cooperate and split rewards fairly). SHAP
-applies this same rule to model features instead of friends: each feature
-is a "player," the prediction is the "reward," and a feature's Shapley
-value is its fair share of credit for that one prediction — averaged over
-every possible order the features could've been revealed to the model.
-
-**Worked example, with real numbers.** You and two friends run a lemonade
-stand. Alice makes the lemonade, Bob yells to bring customers over, Charlie
-brought ice. Revenue by group:
-
-| Who's there | Revenue |
-|---|---|
-| Nobody | $0 |
-| Alice alone | $10 (lemonade exists, but warm, nobody knows) |
-| Bob alone | $0 (yelling with no lemonade) |
-| Charlie alone | $0 (just ice, no lemonade) |
-| Alice + Bob | $40 (good lemonade, good crowd, but warm) |
-| Alice + Charlie | $20 (cold lemonade, nobody notices) |
-| Bob + Charlie | $0 (yelling around ice, no lemonade) |
-| All three | $100 (cold, delicious, popular) |
-
-Watch Charlie's contribution change depending on who's already there: if he
-joins Alice+Bob (already at $40), the total jumps to $100 — Charlie added
-**+$60**. If he joins Bob alone (at $0), the total stays $0 — Charlie added
-**$0**. Same person, wildly different contribution, purely because of
-context. That's exactly why you can't just look at one scenario — you check
-every possible order the three could've joined in, and average Charlie's
-contribution across all of them, to get his one true fair share (his
-Shapley value).
-
-### Idea 2: A fast shortcut for tree-based models (TreeSHAP)
-
-If you have a lot of features, checking every possible order they could be
-revealed in takes way too long — for more than ~20 features, it's more
-combinations than you could ever compute, even with a huge computer.
-
-But if the model is a decision tree (section 2), there's a shortcut. As
-your data point walks down one yes/no question chain, at every fork, the
-tree already remembers — from when it was trained — roughly what fraction
-of training examples went left vs. right at that exact fork. Using those
-already-known fractions, you can correctly work out every feature's fair
-share **while walking the tree just once**, instead of separately checking
-every possible order. Same fair-share (Shapley) answer as Idea 1, computed
-via a much faster shortcut. This shortcut is called **TreeSHAP**.
-
-### Idea 3: Fixing a rounding-error problem in that shortcut (quadrature)
-
-Here's a real problem: TreeSHAP's shortcut involves a lot of multiplying
-and dividing numbers together as you walk down a really long chain of
-yes/no questions (30+ levels deep). When a computer multiplies and divides
-tiny numbers together over and over, **small rounding mistakes pile up** —
-like a game of telephone, where a message whispered around a big circle of
-100 kids comes back garbled, even though everyone tried to whisper it
-correctly.
-
-When this happens with TreeSHAP on very deep trees, the feature
-contributions stop adding up to the right total — breaking the one rule
-that matters most (the numbers must add up exactly, nothing lost, nothing
-extra).
-
-**The fix a group of researchers found (the paper you shared):** there's a
-close cousin of the Shapley/fair-share rule, called a **Banzhaf value**,
-that computes credit slightly differently and doesn't have this
-rounding-error problem — it stays accurate even on very deep trees. It's
-not quite the number you actually want, though. So here's the trick: the
-Banzhaf version has a hidden "dial," a probability you can set anywhere
-from 0 to 1. The researchers proved that **if you compute the Banzhaf
-answer at every possible dial setting from 0 to 1, and average all of
-those answers together, you get back the exact original Shapley answer** —
-not an estimate, the literal correct number.
-
-Checking every dial setting from 0 to 1 sounds like it should also take
-forever (infinite settings in between). But it turns out you only need to
-check **8 specific, carefully chosen dial settings** to get the perfect
-answer, no matter how deep the tree is. That "only need to check a handful
-of clever spots to know the full answer" trick is what the math term
-**quadrature** means — a smart, small set of points that lets you compute
-an average/integral almost exactly, without checking every possible value.
+- **Quadrature (fixing a rounding-error bug in that shortcut)** — on very
+  deep trees (30+ levels), TreeSHAP's shortcut does so much repeated
+  multiplying/dividing that tiny computer rounding errors pile up and
+  break the "credit must add up exactly" guarantee. The fix (the paper you
+  shared): compute a numerically-safer cousin quantity (a **Banzhaf
+  value**) at a handful of specific points and average them — and prove
+  that average gives back the *exact* original Shapley answer. Only **8**
+  such points are needed, no matter how deep the tree is. That "a handful
+  of clever points is enough to know the whole answer" trick is what
+  **quadrature** means.
 
 ---
 
